@@ -1,0 +1,45 @@
+"""
+Tests for GitHubClient
+"""
+import pytest
+from unittest.mock import Mock, patch
+from src.github_client import GitHubClient
+
+
+class TestGitHubClient:
+    """Test cases for GitHubClient"""
+    
+    def test_init(self):
+        """Test client initialization"""
+        client = GitHubClient(token="test-token")
+        assert client.token == "test-token"
+        assert client.headers["Authorization"] == "token test-token"
+    
+    @patch("src.github_client.requests.get")
+    def test_get_pr_files(self, mock_get):
+        """Test getting PR files"""
+        mock_response = Mock()
+        mock_response.json.return_value = [
+            {"filename": "test.py", "status": "modified"}
+        ]
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+        
+        client = GitHubClient(token="test-token")
+        files = client.get_pr_files("owner", "repo", 1)
+        
+        assert len(files) == 1
+        assert files[0]["filename"] == "test.py"
+    
+    @patch("src.github_client.requests.post")
+    def test_post_pr_comment(self, mock_post):
+        """Test posting PR comment"""
+        mock_response = Mock()
+        mock_response.json.return_value = {"id": 123}
+        mock_response.raise_for_status = Mock()
+        mock_post.return_value = mock_response
+        
+        client = GitHubClient(token="test-token")
+        result = client.post_pr_comment("owner", "repo", 1, "Test comment")
+        
+        assert result["id"] == 123
