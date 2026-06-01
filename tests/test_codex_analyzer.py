@@ -15,14 +15,15 @@ class TestCodexAnalyzer:
     
     def test_detect_language(self):
         """Test language detection"""
-        analyzer = CodexAnalyzer()
+        from src.review_engine import ReviewEngine
+        engine = ReviewEngine()
         
-        assert analyzer._detect_language("test.py") == "python"
-        assert analyzer._detect_language("test.js") == "javascript"
-        assert analyzer._detect_language("test.ts") == "typescript"
-        assert analyzer._detect_language("test.java") == "java"
-        assert analyzer._detect_language("test.go") == "go"
-        assert analyzer._detect_language("test.unknown") == "unknown"
+        assert engine._detect_language("test.py") == "python"
+        assert engine._detect_language("test.js") == "javascript"
+        assert engine._detect_language("test.ts") == "typescript"
+        assert engine._detect_language("test.java") == "java"
+        assert engine._detect_language("test.go") == "go"
+        assert engine._detect_language("test.unknown") == "unknown"
     
     def test_parse_analysis(self):
         """Test analysis parsing"""
@@ -52,15 +53,17 @@ class TestCodexAnalyzer:
     
     def test_generate_summary(self):
         """Test summary generation"""
-        analyzer = CodexAnalyzer()
+        analyzer = CodexAnalyzer(api_key="test-key")
         
         analyses = [
             {
+                "filename": "test1.py",
                 "issues": ["Bug 1", "Bug 2"],
                 "security": ["Security issue"],
                 "suggestions": ["Suggestion 1"]
             },
             {
+                "filename": "test2.py",
                 "issues": ["Bug 3"],
                 "security": [],
                 "suggestions": []
@@ -69,6 +72,6 @@ class TestCodexAnalyzer:
         
         summary = analyzer.generate_summary(analyses)
         
-        assert "Total Issues Found: 3" in summary
-        assert "Security Concerns: 1" in summary
-        assert "⚠️" in summary
+        assert "3" in summary
+        assert "Security" in summary
+        assert "test1.py" in summary

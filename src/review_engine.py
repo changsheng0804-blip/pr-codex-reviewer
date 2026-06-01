@@ -1,272 +1,272 @@
 """
-代码审查引擎模块
+Code Review Engine Module
 
-这个模块是项目的核心协调器，负责：
-1. 接收PR审查请求（来自Webhook或手动调用）
-2. 获取PR的代码变更
-3. 调用AI分析代码
-4. 生成并发布审查报告
+This module is the core coordinator of the project, responsible for:
+1. Receiving PR review requests (from Webhook or manual invocation)
+2. Fetching PR code changes
+3. Calling AI for code analysis
+4. Generating and posting review reports
 
-工作流程:
-    1. GitHub Webhook触发 → handle_webhook()
-    2. 提取PR信息 → review_pr()
-    3. 获取修改的文件 → get_pr_files()
-    4. 过滤支持的文件 → _filter_supported_files()
-    5. 分析每个文件 → _analyze_file()
-    6. 生成总结报告 → generate_summary()
-    7. 发布审查结果 → submit_review()
+Workflow:
+    1. GitHub Webhook trigger -> handle_webhook()
+    2. Extract PR information -> review_pr()
+    3. Get modified files -> get_pr_files()
+    4. Filter supported files -> _filter_supported_files()
+    5. Analyze each file -> _analyze_file()
+    6. Generate summary report -> generate_summary()
+    7. Post review result -> submit_review()
 
-设计模式:
-    使用组合模式，将GitHubClient和CodexAnalyzer组合在一起，
-    协调它们完成完整的审查流程。
+Design Pattern:
+    Uses a composite pattern, combining GitHubClient and CodexAnalyzer
+    to coordinate them in completing the full review workflow.
 """
 
 from typing import Dict, List, Optional
-from .github_client import GitHubClient
-from .codex_analyzer import CodexAnalyzer
-from .config import Config
+from src.github_client import GitHubClient
+from src.codex_analyzer import CodexAnalyzer
+from src.config import Config
 
 
 class ReviewEngine:
     """
-    PR审查引擎
-    
-    这是项目的主要协调类，负责管理整个代码审查流程。
-    
-    使用方法:
+    PR Review Engine
+
+    This is the main coordinator class of the project, responsible for
+    managing the entire code review workflow.
+
+    Usage:
         engine = ReviewEngine()
-        
-        # 审查特定PR
+
+        # Review a specific PR
         result = engine.review_pr("owner", "repo", 123)
-        print(f"审查了 {result['files_reviewed']} 个文件")
-        
-        # 处理Webhook
-        payload = {...}  # GitHub Webhook数据
+        print(f"Reviewed {result['files_reviewed']} files")
+
+        # Process a Webhook
+        payload = {...}  # GitHub Webhook data
         result = engine.handle_webhook(payload)
-    
-    属性:
-        github: GitHub API客户端
-        analyzer: AI代码分析器
+
+    Attributes:
+        github: GitHub API client
+        analyzer: AI code analyzer
     """
-    
+
     def __init__(self):
         """
-        初始化审查引擎
-        
-        自动创建所需的GitHubClient和CodexAnalyzer实例。
+        Initialize the review engine.
+
+        Automatically creates the required GitHubClient and CodexAnalyzer instances.
         """
         self.github = GitHubClient()
         self.analyzer = CodexAnalyzer()
-    
+
     def review_pr(self, owner: str, repo: str, pr_number: int) -> Dict:
         """
-        审查一个PR并发布结果
-        
-        这是主要的审查方法，执行完整的审查流程：
-        1. 获取PR修改的文件列表
-        2. 过滤出支持的文件
-        3. 分析每个文件
-        4. 生成总结报告
-        5. 发布审查评论
-        
-        参数:
-            owner: 仓库所有者用户名
-            repo: 仓库名称
-            pr_number: PR编号
-            
-        返回:
-            Dict: 审查结果，包含:
-                - status: 状态（success/skipped/error）
-                - files_reviewed: 审查的文件数
-                - total_issues: 发现的问题数
-                - reason: 如果跳过或出错，说明原因
-                - error: 如果出错，包含错误信息
-                
-        示例:
+        Review a PR and post the result.
+
+        This is the main review method, executing the full review workflow:
+        1. Get list of files modified in the PR
+        2. Filter supported files
+        3. Analyze each file
+        4. Generate summary report
+        5. Post review comment
+
+        Args:
+            owner: Repository owner username
+            repo: Repository name
+            pr_number: PR number
+
+        Returns:
+            Dict: Review result containing:
+                - status: Status (success/skipped/error)
+                - files_reviewed: Number of files reviewed
+                - total_issues: Number of issues found
+                - reason: If skipped or errored, explains the reason
+                - error: If errored, contains the error message
+
+        Example:
             result = engine.review_pr("facebook", "react", 12345)
-            
+
             if result["status"] == "success":
-                print(f"审查完成！发现 {result['total_issues']} 个问题")
+                print(f"Review complete! Found {result['total_issues']} issues")
             elif result["status"] == "skipped":
-                print(f"跳过: {result['reason']}")
+                print(f"Skipped: {result['reason']}")
             else:
-                print(f"错误: {result['error']}")
+                print(f"Error: {result['error']}")
         """
-        
         try:
-            # 步骤1: 获取PR修改的文件
-            print(f"正在获取 PR #{pr_number} 的文件列表...")
+            # Step 1: Get PR files
+            print(f"Getting PR #{pr_number} files...")
             files = self.github.get_pr_files(owner, repo, pr_number)
-            
-            # 步骤2: 过滤支持的文件
+
+            # Step 2: Filter supported files
             supported_files = self._filter_supported_files(files)
-            
-            # 如果没有支持的文件，跳过审查
+
+            # Skip if no supported files
             if not supported_files:
                 return {
                     "status": "skipped",
-                    "reason": "没有需要审查的文件（不支持的格式或文件过大）"
+                    "reason": "No supported files to review (unsupported format or file too large)"
                 }
-            
-            print(f"找到 {len(supported_files)} 个需要审查的文件")
-            
-            # 步骤3: 分析每个文件
+
+            print(f"Found {len(supported_files)} files to review")
+
+            # Step 3: Analyze each file
             analyses = []
             for i, file_info in enumerate(supported_files, 1):
-                print(f"正在分析文件 {i}/{len(supported_files)}: {file_info['filename']}")
+                print(f"Analyzing file {i}/{len(supported_files)}: {file_info['filename']}")
                 analysis = self._analyze_file(owner, repo, file_info)
                 analyses.append(analysis)
-            
-            # 步骤4: 生成总结报告
-            print("正在生成审查报告...")
+
+            # Step 4: Generate summary report
+            print("Generating review report...")
             summary = self.analyzer.generate_summary(analyses)
-            
-            # 步骤5: 发布审查结果
-            print("正在发布审查评论...")
+
+            # Step 5: Submit review
+            print("Submitting review comment...")
             self.github.submit_review(
                 owner, repo, pr_number,
                 body=summary,
-                event="COMMENT"  # 仅评论，不阻止合并
+                event="COMMENT"
             )
-            
-            # 计算统计信息
+
+            # Calculate statistics
             total_issues = sum(len(a.get("issues", [])) for a in analyses)
-            
-            print(f"审查完成！发现 {total_issues} 个问题")
-            
+
+            print(f"Review complete! Found {total_issues} issues")
+
             return {
                 "status": "success",
                 "files_reviewed": len(supported_files),
                 "total_issues": total_issues
             }
-            
+
         except Exception as e:
-            # 错误处理
+            # Error handling
             error_msg = str(e)
-            print(f"审查失败: {error_msg}")
-            
+            print(f"Review failed: {error_msg}")
+
             return {
                 "status": "error",
                 "error": error_msg
             }
-    
+
     def _filter_supported_files(self, files: List[Dict]) -> List[Dict]:
         """
-        过滤出支持审查的文件
-        
-        根据以下条件过滤：
-        1. 文件扩展名在支持列表中
-        2. 文件大小不超过限制
-        3. 数量不超过限制
-        
-        参数:
-            files: GitHub API返回的文件列表
-            
-        返回:
-            List[Dict]: 过滤后的文件列表
+        Filter files supported for review.
+
+        Filter based on the following conditions:
+        1. File extension is in the supported list
+        2. File size does not exceed the limit
+        3. Quantity does not exceed the limit
+
+        Args:
+            files: List of files returned by the GitHub API
+
+        Returns:
+            List[Dict]: List of files after filtering
         """
         supported = []
-        
+
         for file in files:
             filename = file.get("filename", "").lower()
-            
-            # 检查1: 文件扩展名是否支持
+
+            # Check: is the file extension supported?
             is_supported = any(
                 filename.endswith(f".{ext}")
                 for ext in Config.SUPPORTED_LANGUAGES
             )
-            
+
             if not is_supported:
-                continue  # 跳过不支持的文件
-            
-            # 检查2: 文件大小是否超过限制
+                continue  # Skip unsupported files
+
+            # Check: does the file size exceed the limit?
             file_size = file.get("changes", 0)
             if file_size > Config.MAX_FILE_SIZE:
-                print(f"跳过过大的文件: {filename} ({file_size} 字节)")
+                print(f"Skipping oversized file: {filename} ({file_size} bytes)")
                 continue
-            
-            # 添加到支持列表
+
+            # Add to supported list
             supported.append(file)
-            
-            # 检查3: 是否达到数量限制
+
+            # Check: max file count
             if len(supported) >= Config.MAX_FILES_PER_REVIEW:
-                print(f"已达到最大文件数限制 ({Config.MAX_FILES_PER_REVIEW})")
+                print(f"Max file limit reached ({Config.MAX_FILES_PER_REVIEW})")
                 break
-        
+
         return supported
-    
+
     def _analyze_file(self, owner: str, repo: str, file_info: Dict) -> Dict:
         """
-        分析单个文件
-        
-        从GitHub获取文件的patch（代码差异），然后调用AI进行分析。
-        
-        参数:
-            owner: 仓库所有者
-            repo: 仓库名称
-            file_info: 文件信息字典（来自GitHub API）
-            
-        返回:
-            Dict: 分析结果，包含文件名和各类问题
+        Analyze a single file.
+
+        Fetch the file's patch (code diff) from GitHub, then call AI for analysis.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            file_info: File info dictionary (from GitHub API)
+
+        Returns:
+            Dict: Analysis result containing filename and various types of issues
         """
         filename = file_info["filename"]
         patch = file_info.get("patch", "")
-        
-        # 自动检测编程语言
+
+        # Auto-detect programming language
         language = self._detect_language(filename)
-        
-        # 调用AI分析代码
+
+        # Call AI to analyze code
         analysis = self.analyzer.analyze_code(
             code=patch,
             language=language,
-            context=f"文件: {filename}"
+            context=f"File: {filename}"
         )
-        
-        # 添加文件名到分析结果
+
+        # Add filename to analysis result
         return {
             "filename": filename,
             **analysis
         }
-    
+
     def _detect_language(self, filename: str) -> str:
         """
-        根据文件名检测编程语言
-        
-        使用文件扩展名映射到语言名称。
-        
-        参数:
-            filename: 文件名（包含扩展名）
-            
-        返回:
-            str: 语言名称，如果未知返回 "unknown"
-            
-        示例:
-            engine._detect_language("main.py")      # 返回: "python"
-            engine._detect_language("app.js")       # 返回: "javascript"
-            engine._detect_language("unknown.xyz")  # 返回: "unknown"
+        Detect programming language based on filename.
+
+        Uses a mapping from file extension to language name.
+
+        Args:
+            filename: Filename (including extension)
+
+        Returns:
+            str: Language name, returns "unknown" if not recognized
+
+        Example:
+            engine._detect_language("main.py")      # Returns: "python"
+            engine._detect_language("app.js")       # Returns: "javascript"
+            engine._detect_language("unknown.xyz")  # Returns: "unknown"
         """
-        # 扩展名到语言的映射表
+        # Extension to language mapping
         extension_map = {
             # Python
             ".py": "python",
             ".pyw": "python",
             ".pyi": "python",
-            
+
             # JavaScript/TypeScript
             ".js": "javascript",
             ".jsx": "javascript",
             ".ts": "typescript",
             ".tsx": "typescript",
-            
+
             # Java
             ".java": "java",
-            
+
             # Go
             ".go": "go",
-            
+
             # Rust
             ".rs": "rust",
-            
+
             # C/C++
             ".cpp": "cpp",
             ".cxx": "cpp",
@@ -275,71 +275,71 @@ class ReviewEngine:
             ".h": "c",
             ".hpp": "cpp"
         }
-        
-        # 转换为小写并查找
+
+        # Convert to lowercase and look up
         filename_lower = filename.lower()
         for ext, lang in extension_map.items():
             if filename_lower.endswith(ext):
                 return lang
-        
+
         return "unknown"
-    
+
     def handle_webhook(self, payload: Dict) -> Dict:
         """
-        处理GitHub Webhook请求
-        
-        解析Webhook的JSON数据，提取PR信息，然后调用审查流程。
-        
-        支持的Webhook事件:
-            - pull_request.opened: PR被创建
-            - pull_request.synchronize: PR被更新（推送新提交）
-        
-        参数:
-            payload: GitHub Webhook的JSON数据
-            
-        返回:
-            Dict: 处理结果
-            
-        示例:
+        Handle a GitHub Webhook request.
+
+        Parse the JSON data from the Webhook, extract PR information,
+        and then call the review workflow.
+
+        Supported Webhook events:
+            - pull_request.opened: PR was created
+            - pull_request.synchronize: PR was updated (pushed new commits)
+
+        Args:
+            payload: JSON data from GitHub Webhook
+
+        Returns:
+            Dict: Processing result
+
+        Example:
             from flask import request
-            
+
             @app.route('/webhook', methods=['POST'])
             def webhook():
                 payload = request.get_json()
                 result = engine.handle_webhook(payload)
                 return jsonify(result)
         """
-        
-        # 检查事件类型
+        # Check event type
         action = payload.get("action")
         if action not in ["opened", "synchronize"]:
             return {
                 "status": "ignored",
-                "reason": f"不处理 '{action}' 事件，只处理 opened 和 synchronize"
+                "reason": f"Ignoring '{action}' event, only handling opened and synchronize"
             }
-        
-        # 提取PR数据
+
+        # Extract PR data
         pr_data = payload.get("pull_request", {})
         if not pr_data:
             return {
                 "status": "error",
-                "reason": "Webhook数据中没有找到PR信息"
+                "reason": "No PR info found in webhook data"
             }
-        
-        # 提取仓库信息
+
+        # Extract repository info
         repo_data = payload.get("repository", {})
         owner = repo_data.get("owner", {}).get("login")
         repo = repo_data.get("name")
         pr_number = pr_data.get("number")
-        
-        # 验证必需信息
+
+        # Validate required info
         if not all([owner, repo, pr_number]):
             return {
                 "status": "error",
-                "reason": "缺少必需的仓库或PR信息"
+                "reason": "Missing required repository or PR info"
             }
-        
-        print(f"收到PR事件: {owner}/{repo}#{pr_number} ({action})")
-        
-        # 开始审查
+
+        print(f"Received PR event: {owner}/{repo}#{pr_number} ({action})")
+
+        # Start review
         return self.review_pr(owner, repo, pr_number)

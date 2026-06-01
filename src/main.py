@@ -3,9 +3,14 @@ Main application entry point for PR Codex Reviewer
 """
 import os
 import sys
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify
-from .review_engine import ReviewEngine
-from .config import Config
+
+# Load environment variables from .env file before importing other modules
+load_dotenv()
+
+from src.review_engine import ReviewEngine
+from src.config import Config
 
 app = Flask(__name__)
 engine = ReviewEngine()
@@ -26,15 +31,15 @@ def webhook():
     """GitHub webhook endpoint"""
     try:
         payload = request.get_json()
-        
+
         if not payload:
             return jsonify({"status": "error", "reason": "No payload"}), 400
-        
+
         # Handle the webhook
         result = engine.handle_webhook(payload)
-        
+
         return jsonify(result)
-        
+
     except Exception as e:
         return jsonify({"status": "error", "reason": str(e)}), 500
 
@@ -45,7 +50,7 @@ def manual_review(owner: str, repo: str, pr_number: int):
     try:
         result = engine.review_pr(owner, repo, pr_number)
         return jsonify(result)
-        
+
     except Exception as e:
         return jsonify({"status": "error", "reason": str(e)}), 500
 

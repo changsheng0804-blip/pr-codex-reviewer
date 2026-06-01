@@ -1,121 +1,121 @@
 """
-OpenAI Codex 代码分析模块
+OpenAI Codex Code Analysis Module
 
-这个模块负责调用OpenAI API进行代码分析，是项目的核心智能组件。
+This module is responsible for calling the OpenAI API for code analysis
+and is the core intelligence component of the project.
 
-功能:
-    - 分析代码中的潜在问题（Bug、安全漏洞、性能问题）
-    - 生成改进建议
-    - 创建结构化的审查报告
+Features:
+    - Analyze potential issues in code (bugs, security vulnerabilities, performance issues, etc.)
+    - Generate improvement suggestions
+    - Create structured review reports
 
-设计思路:
-    使用OpenAI的ChatCompletion API，通过精心设计的Prompt引导AI进行代码审查。
-    分析结果会被解析为结构化数据，便于后续处理和展示。
+Design Approach:
+    Uses OpenAI's ChatCompletion API, guiding the AI to perform code
+    review through carefully designed prompts. The analysis results are
+    parsed into structured data for downstream processing and presentation.
 
-API文档:
+API Docs:
     https://platform.openai.com/docs/api-reference/chat
 """
 
 import openai
 from typing import Dict, List, Optional
-from .config import Config
+from src.config import Config
 
 
 class CodexAnalyzer:
     """
-    OpenAI Codex 代码分析器
-    
-    这个类封装了与OpenAI API的交互，提供了代码分析的核心功能。
-    
-    使用方法:
+    OpenAI Codex Code Analyzer
+
+    This class encapsulates the interaction with the OpenAI API and
+    provides the core functionality of code analysis.
+
+    Usage:
         analyzer = CodexAnalyzer()
-        
-        # 分析代码
+
+        # Analyze code
         result = analyzer.analyze_code(
             code="def hello(): print('world')",
             language="python"
         )
-        
-        # 查看问题
+
+        # View issues
         for issue in result["issues"]:
-            print(f"问题: {issue}")
-    
-    属性:
-        api_key: OpenAI API密钥
-        model: 使用的AI模型
-        max_tokens: 最大Token数限制
+            print(f"Issue: {issue}")
+
+    Attributes:
+        api_key: OpenAI API key
+        model: AI model to use
+        max_tokens: Maximum token limit
     """
-    
+
     def __init__(self, api_key: Optional[str] = None):
         """
-        初始化Codex分析器
-        
-        参数:
-            api_key: OpenAI API密钥，
-                    如果不提供，会从 Config.OPENAI_API_KEY 读取
+        Initialize the Codex analyzer.
+
+        Args:
+            api_key: OpenAI API key. If not provided, reads from Config.OPENAI_API_KEY
         """
         self.api_key = api_key or Config.OPENAI_API_KEY
         openai.api_key = self.api_key
         self.model = Config.OPENAI_MODEL
         self.max_tokens = Config.OPENAI_MAX_TOKENS
-    
+
     def analyze_code(self, code: str, language: str,
-                    context: Optional[str] = None) -> Dict:
+                     context: Optional[str] = None) -> Dict:
         """
-        分析代码并返回结构化结果
-        
-        这个方法会:
-        1. 构建分析Prompt（包含代码和审查要求）
-        2. 调用OpenAI API获取分析结果
-        3. 解析结果为结构化数据
-        
-        参数:
-            code: 要分析的代码文本
-            language: 编程语言（如 "python", "javascript"）
-            context: 可选的上下文信息（如文件名、PR描述等）
-            
-        返回:
-            Dict: 结构化分析结果，包含:
-                - issues: 问题列表
-                - suggestions: 建议列表
-                - security: 安全问题列表
-                - performance: 性能问题列表
-                - error: 如果出错，包含错误信息
-                
-        示例:
+        Analyze code and return structured results.
+
+        This method:
+        1. Builds the analysis prompt (including code and review requirements)
+        2. Calls the OpenAI API to get the analysis result
+        3. Parses the result into structured data
+
+        Args:
+            code: Code text to analyze
+            language: Programming language (e.g. "python", "javascript")
+            context: Optional contextual information (e.g. filename, PR description)
+
+        Returns:
+            Dict: Structured analysis result containing:
+                - issues: List of issues
+                - suggestions: List of improvement suggestions
+                - security: List of security issues
+                - performance: List of performance issues
+                - error: If an error occurred, contains the error message
+
+        Example:
             code = '''
             def divide(a, b):
                 return a / b
             '''
-            
+
             result = analyzer.analyze_code(code, "python")
-            
+
             if result.get("security"):
-                print("发现安全问题！")
+                print("Security issues found:")
                 for issue in result["security"]:
                     print(f"  - {issue}")
         """
-        
-        # 构建分析Prompt
+        # Build the analysis prompt
         prompt = self._build_analysis_prompt(code, language, context)
-        
+
         try:
-            # 调用OpenAI API
-            # 使用ChatCompletion API，因为它对指令遵循更好
+            # Call OpenAI API
             response = openai.ChatCompletion.create(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
                         "content": (
-                            "你是一位资深的代码审查专家。请分析提供的代码，"
-                            "重点关注以下方面:\n"
-                            "1. 潜在的Bug和逻辑错误\n"
-                            "2. 安全漏洞（如SQL注入、XSS、敏感信息泄露等）\n"
-                            "3. 代码风格和最佳实践\n"
-                            "4. 性能优化机会\n"
-                            "5. 可维护性问题\n\n"
-                            "请提供具体、可操作的改进建议。"
+                            "You are a senior code review expert. Analyze the provided code, "
+                            "focusing on:\n"
+                            "1. Potential bugs and logic errors\n"
+                            "2. Security vulnerabilities (SQL injection, XSS, sensitive info leaks, etc.)\n"
+                            "3. Code style and best practices\n"
+                            "4. Performance optimization opportunities\n"
+                            "5. Maintainability issues\n\n"
+                            "Provide specific, actionable improvement suggestions."
                         )
                     },
                     {
@@ -124,17 +124,17 @@ class CodexAnalyzer:
                     }
                 ],
                 max_tokens=self.max_tokens,
-                temperature=0.3  # 较低的温度使输出更稳定、更确定
+                temperature=0.3
             )
-            
-            # 提取AI的回复文本
+
+            # Extract AI response
             analysis = response.choices[0].message.content
-            
-            # 解析为结构化数据
+
+            # Parse into structured data
             return self._parse_analysis(analysis)
-            
+
         except Exception as e:
-            # 错误处理：返回包含错误信息的字典
+            # Error handling: return a dictionary containing the error message
             return {
                 "error": str(e),
                 "issues": [],
@@ -142,83 +142,84 @@ class CodexAnalyzer:
                 "security": [],
                 "performance": []
             }
-    
+
     def _build_analysis_prompt(self, code: str, language: str,
-                              context: Optional[str]) -> str:
+                               context: Optional[str]) -> str:
         """
-        构建代码分析Prompt
-        
-        这个方法将代码和上下文信息格式化为AI可以理解的Prompt。
-        使用Markdown代码块格式，帮助AI识别代码。
-        
-        参数:
-            code: 代码文本
-            language: 编程语言
-            context: 上下文信息
-            
-        返回:
-            str: 格式化的Prompt文本
+        Build the code analysis prompt.
+
+        This method formats the code and context into a prompt that
+        the AI can understand. Uses Markdown code block formatting
+        to help the AI recognize the code.
+
+        Args:
+            code: Code text
+            language: Programming language
+            context: Contextual information
+
+        Returns:
+            str: Formatted prompt text
         """
-        # 构建基础Prompt
-        prompt = f"请审查以下{language}代码:\n\n"
-        
-        # 添加代码块（使用Markdown格式）
+        # Build the base prompt
+        prompt = f"Please review the following {language} code:\n\n"
+
+        # Add the code block (using Markdown format)
         prompt += f"```{language}\n{code}\n```\n\n"
-        
-        # 添加上下文（如果有）
+
+        # Add context (if any)
         if context:
-            prompt += f"上下文信息: {context}\n\n"
-        
-        # 指定输出格式，便于后续解析
-        prompt += "请按以下格式提供分析结果:\n\n"
+            prompt += f"Context: {context}\n\n"
+
+        # Specify the output format for easier parsing later
+        prompt += "Please provide analysis results in the following format:\n\n"
         prompt += "ISSUES:\n"
-        prompt += "- [具体问题描述，包含位置和建议]\n\n"
+        prompt += "- [Specific issue description, with location and suggestions]\n\n"
         prompt += "SUGGESTIONS:\n"
-        prompt += "- [改进建议，包含代码示例]\n\n"
+        prompt += "- [Improvement suggestions, with code examples]\n\n"
         prompt += "SECURITY:\n"
-        prompt += "- [安全问题，如果有]\n\n"
+        prompt += "- [Security issues, if any]\n\n"
         prompt += "PERFORMANCE:\n"
-        prompt += "- [性能优化建议，如果有]\n"
-        
+        prompt += "- [Performance optimization suggestions, if any]\n"
+
         return prompt
-    
+
     def _parse_analysis(self, analysis: str) -> Dict:
         """
-        解析AI的分析文本为结构化数据
-        
-        AI返回的是纯文本，这个方法将其解析为结构化的字典，
-        方便后续处理和展示。
-        
-        解析逻辑:
-            1. 按行遍历文本
-            2. 识别章节标题（ISSUES:, SUGGESTIONS:等）
-            3. 收集每个章节下的列表项
-        
-        参数:
-            analysis: AI返回的分析文本
-            
-        返回:
-            Dict: 结构化分析结果
+        Parse the AI's analysis text into a structured dictionary.
+
+        AI returns plain text; this method parses it into a structured
+        dictionary for easier downstream processing and presentation.
+
+        Parsing logic:
+            1. Iterate through the text line by line
+            2. Identify section headers (ISSUES:, SUGGESTIONS:, etc.)
+            3. Collect list items under each section
+
+        Args:
+            analysis: AI analysis text
+
+        Returns:
+            Dict: Structured analysis result
         """
-        # 初始化结果字典
+        # Initialize result dict
         result = {
-            "issues": [],       # 一般性问题
-            "suggestions": [],  # 改进建议
-            "security": [],     # 安全问题
-            "performance": []   # 性能问题
+            "issues": [],       # General issues
+            "suggestions": [],  # Improvement suggestions
+            "security": [],     # Security issues
+            "performance": []   # Performance issues
         }
-        
-        current_section = None  # 当前正在解析的章节
-        
-        # 逐行解析
+
+        current_section = None  # Current parsing section
+
+        # Parse line by line
         for line in analysis.split("\n"):
             line = line.strip()
-            
-            # 跳过空行
+
+            # Skip empty lines
             if not line:
                 continue
-            
-            # 识别章节标题
+
+            # Identify section headers
             if line.startswith("ISSUES:"):
                 current_section = "issues"
             elif line.startswith("SUGGESTIONS:"):
@@ -227,105 +228,106 @@ class CodexAnalyzer:
                 current_section = "security"
             elif line.startswith("PERFORMANCE:"):
                 current_section = "performance"
-            
-            # 收集列表项（以"- "开头的行）
+
+            # Collect list items (lines starting with "- ")
             elif line.startswith("- ") and current_section:
-                # 去掉"- "前缀，添加到当前章节
+                # Remove the "- " prefix and add to the current section
                 item = line[2:].strip()
-                if item:  # 确保不是空字符串
+                if item:  # Make sure it is not an empty string
                     result[current_section].append(item)
-        
+
         return result
-    
+
     def generate_summary(self, file_analyses: List[Dict]) -> str:
         """
-        生成PR审查总结
-        
-        将多个文件的分析结果汇总为一份完整的PR审查报告。
-        
-        参数:
-            file_analyses: 文件分析结果列表，每个元素是一个分析字典
-            
-        返回:
-            str: Markdown格式的审查总结
-            
-        示例:
+        Generate the PR review summary.
+
+        Aggregates the analysis results of multiple files into a complete
+        PR review report.
+
+        Args:
+            file_analyses: List of file analysis results, each element is an analysis dictionary
+
+        Returns:
+            str: Review summary in Markdown format
+
+        Example:
             analyses = [
                 {
                     "filename": "main.py",
-                    "issues": ["缺少错误处理"],
-                    "security": ["SQL注入风险"]
+                    "issues": ["Missing error handling"],
+                    "security": ["SQL injection risk"]
                 }
             ]
-            
+
             summary = analyzer.generate_summary(analyses)
             print(summary)
         """
-        # 统计各类问题的总数
+        # Count total issues by category
         total_issues = sum(len(a.get("issues", [])) for a in file_analyses)
         total_security = sum(len(a.get("security", [])) for a in file_analyses)
         total_suggestions = sum(len(a.get("suggestions", [])) for a in file_analyses)
-        
-        # 构建Markdown总结
-        summary = "## 🤖 AI 代码审查报告\n\n"
-        
-        # 统计概览
-        summary += "### 📊 统计概览\n\n"
-        summary += f"- **发现问题:** {total_issues} 个\n"
-        summary += f"- **安全警告:** {total_security} 个\n"
-        summary += f"- **改进建议:** {total_suggestions} 个\n"
-        summary += f"- **审查文件:** {len(file_analyses)} 个\n\n"
-        
-        # 如果有安全问题，添加警告
+
+        # Build Markdown summary
+        summary = "## AI Code Review Report\n\n"
+
+        # Statistics overview
+        summary += "### Statistics Overview\n\n"
+        summary += f"- **Issues found:** {total_issues}\n"
+        summary += f"- **Security warnings:** {total_security}\n"
+        summary += f"- **Improvement suggestions:** {total_suggestions}\n"
+        summary += f"- **Files reviewed:** {len(file_analyses)}\n\n"
+
+        # If there are security issues, add a warning
         if total_security > 0:
-            summary += "⚠️ **发现安全问题，请在合并前处理**\n\n"
-        
-        # 详细分析
-        summary += "### 🔍 详细分析\n\n"
-        
+            summary += "> **Security issues found, please address before merging**\n\n"
+
+        # Detailed analysis
+        summary += "### Detailed Analysis\n\n"
+
         for analysis in file_analyses:
-            filename = analysis.get("filename", "未知文件")
-            
-            # 只显示有问题的文件
+            filename = analysis.get("filename", "Unknown file")
+
+            # Only show files with issues
             has_issues = (
                 analysis.get("issues") or
                 analysis.get("security") or
                 analysis.get("suggestions")
             )
-            
+
             if has_issues:
-                summary += f"#### 📄 {filename}\n\n"
-                
-                # 显示问题
+                summary += f"#### {filename}\n\n"
+
+                # Show issues
                 if analysis.get("issues"):
-                    summary += "**❌ 问题:**\n"
+                    summary += "**Issues:**\n"
                     for issue in analysis["issues"]:
                         summary += f"- {issue}\n"
                     summary += "\n"
-                
-                # 显示安全问题
+
+                # Show security issues
                 if analysis.get("security"):
-                    summary += "**🔒 安全:**\n"
+                    summary += "**Security:**\n"
                     for sec in analysis["security"]:
-                        summary += f"- ⚠️ {sec}\n"
+                        summary += f"- {sec}\n"
                     summary += "\n"
-                
-                # 显示建议
+
+                # Show suggestions
                 if analysis.get("suggestions"):
-                    summary += "**💡 建议:**\n"
+                    summary += "**Suggestions:**\n"
                     for suggestion in analysis["suggestions"]:
                         summary += f"- {suggestion}\n"
                     summary += "\n"
-                
-                # 显示性能问题
+
+                # Show performance issues
                 if analysis.get("performance"):
-                    summary += "**⚡ 性能:**\n"
+                    summary += "**Performance:**\n"
                     for perf in analysis["performance"]:
                         summary += f"- {perf}\n"
                     summary += "\n"
-        
-        # 添加页脚
+
+        # Add footer
         summary += "---\n\n"
-        summary += "*由 PR Codex Reviewer 自动生成*\n"
-        
+        summary += "*Generated automatically by PR Codex Reviewer*\n"
+
         return summary
