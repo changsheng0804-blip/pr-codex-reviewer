@@ -1,5 +1,10 @@
 # 🤖 PR Codex Reviewer
 
+> **Note:** This is a portfolio project. It is not actively deployed as a hosted service.
+> The codebase is a self-contained reference implementation: it runs locally and is
+> tested end-to-end (11 passing unit tests). See "Running locally" below if you
+> want to try it on your own machine.
+
 AI-powered PR review bot that automatically reviews GitHub pull requests for code quality, bugs, and security issues using OpenAI Codex.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
